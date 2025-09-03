@@ -1,2 +1,2 @@
 # Flight-Booking-RAP
-Flight booking application usign RAP model and FIORI elements. 
+Flight booking application using RAP model and FIORI elements. 
