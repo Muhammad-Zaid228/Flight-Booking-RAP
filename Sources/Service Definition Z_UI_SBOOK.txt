@@ -1,0 +1,4 @@
+@EndUserText.label: 'Service defination for flight booking'
+define service Z_UI_SBOOK {
+  expose Z_CDS_C_SBOOK;
+}

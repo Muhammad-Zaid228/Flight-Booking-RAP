@@ -1,0 +1,110 @@
+CLASS lhc_Z_CDS_I_SBOOK DEFINITION INHERITING FROM cl_abap_behavior_handler.
+  PRIVATE SECTION.
+
+    METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+      IMPORTING keys REQUEST requested_authorizations FOR z_cds_i_sbook RESULT result.
+
+    METHODS validate_flight_date FOR VALIDATE ON SAVE
+      IMPORTING keys FOR z_cds_i_sbook~validate_flight_date.
+
+    METHODS set_status FOR MODIFY
+      IMPORTING keys FOR ACTION z_cds_i_sbook~set_status RESULT result.
+
+    METHODS default_status FOR DETERMINE ON SAVE
+      IMPORTING keys FOR z_cds_i_sbook~default_status.
+
+ENDCLASS.
+
+CLASS lhc_Z_CDS_I_SBOOK IMPLEMENTATION.
+
+  METHOD get_instance_authorizations.
+  ENDMETHOD.
+
+  " Validation
+  METHOD validate_flight_date.
+
+    " Read the flight booking instance(s) of the transferred keys (keys) using the EML statement READ ENTITIES.
+    " The addition FIELDS is used to specify the fields to be read. Only FlightDate is relevant for the present validation.
+    " The addition IN LOCAL MODE is used to exclude feature controls and authorization checks
+    READ ENTITIES OF z_cds_i_sbook IN LOCAL MODE
+    ENTITY z_cds_i_sbook
+    ALL FIELDS WITH CORRESPONDING #( keys )
+    RESULT DATA(lt_key_flight_date).
+
+    LOOP AT lt_key_flight_date INTO DATA(ls_key_flight_date).
+
+      IF ls_key_flight_date-FlightDate < cl_abap_context_info=>get_system_date( ).
+
+        " FAILED is used for logging instances for which an operation has failed.
+        " validation can reject inconsistent instance data from being saved by passing the keys of failed instances
+        " to the corresponding table in the FAILED structure
+        " %tky is derived type component groups summarizing all primary keys of a RAP BO instance.
+        APPEND VALUE #( %tky = ls_key_flight_date-%tky ) TO failed-z_cds_i_sbook.
+
+        " validation can return messages to the consumer
+        " by passing them to the corresponding table in the REPORTED structure.
+        " %tky is derived type component groups summarizing all primary keys of a RAP BO instance.
+        " %element is used to assign messages to target fields by marking data field in %element structure
+        " %msg provides an instance of the message interface IF_ABAP_BEHV_MESSAGE.
+        " If no self-implementation of the interface is needed,
+        " the inherited methods new_message_with_text( ) can be used to get a standard implementation.
+        APPEND VALUE #( %tky = ls_key_flight_date-%tky
+                        " if_abap_behv=>mk-on return type is RAW(1) and not CHAR(1).
+                        " Constants ABAP_TRUE, ABAP_FALSE or literals 'X' and ' ' are not compatible.
+                        %element-FlightDate = if_abap_behv=>mk-on
+                        %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error
+                                                      text = 'Flight Date cannot be past dated' )
+                      ) TO reported-z_cds_i_sbook.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+  " Action
+  METHOD set_status.
+
+  " The EML statement MODIFY ENTITIES … UPDATE FIELDS is used to update specific fields of the instances
+  MODIFY ENTITIES OF z_cds_i_sbook IN LOCAL MODE
+        ENTITY z_cds_i_sbook
+        UPDATE FIELDS ( Cancelled )
+        WITH  VALUE #( FOR key IN keys ( %tky = key-%tky
+                      cancelled = abap_true )
+                    ) .  " The internal tables are filled inline using the constructor
+                         " operator VALUE which made the need for explicit declaration obsolete.
+
+    " read changed data for action result
+    " The EML statement READ ENTITIES … ALL FIELDS WITH CORRESPONDING
+    " is used to read all fields of the updated instances from the buffer to fill the input parameter result
+    READ ENTITIES OF z_cds_i_sbook  IN LOCAL MODE
+        ENTITY z_cds_i_sbook
+        ALL FIELDS WITH
+        CORRESPONDING #( keys )
+        RESULT DATA(lt_sbook).
+
+    " set action result
+    result = VALUE #( FOR ls_sbook IN lt_sbook ( %tky   = ls_sbook-%tky
+                                                              %param = ls_sbook ) ).
+
+  ENDMETHOD.
+
+  METHOD default_status.
+
+  READ ENTITIES OF z_cds_i_sbook IN LOCAL MODE   "IN LOCAL MODE - to exclude feature controls and authorization checks.
+    ENTITY z_cds_i_sbook
+    FIELDS ( cancelled ) WITH CORRESPONDING #( keys )
+    RESULT DATA(lt_key_status).
+
+    IF lt_key_status IS NOT INITIAL.
+      LOOP AT lt_key_status INTO DATA(ls_status).
+        IF  ls_status-cancelled IS INITIAL.
+          MODIFY ENTITIES OF z_cds_i_sbook IN LOCAL MODE
+          ENTITY z_cds_i_sbook
+          UPDATE  FIELDS ( cancelled )
+          WITH VALUE #( FOR ls_key_status IN lt_key_status
+                         ( %tky = ls_key_status-%tky cancelled = 'O' ) ).
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+
+  ENDMETHOD.
+
+ENDCLASS.
