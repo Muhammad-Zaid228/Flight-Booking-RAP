@@ -1,6 +1,6 @@
 # RAP Flight Booking Application (Z_SBOOK)
 
-A modern RESTful ABAP Programming (RAP) application for managing flight booking data, built on the SAP BOPF framework and exposed as an OData V4 service.
+A modern RESTful ABAP Programming (RAP) application for managing flight booking data, built on the SAP BOPF framework and exposed as an OData V4/V2 service.
 
 ## Prerequisites
 
